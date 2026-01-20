@@ -1,0 +1,49 @@
+@use "./variable" as var;
+
+.media-container {
+  margin-top: 8px;
+}
+
+.media-link {
+  font-weight: 500;
+  background-color: #eaf6ff;
+  color: var.$primary;
+  display: flex;
+  padding: 6px 12px;
+  border-radius: 12px;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.media-icon {
+  font-size: 16px;
+}
+
+.media-caption {
+  font-size: 0.85rem;
+  margin-top: 4px;
+  color: #555;
+}
+
+.media-wrapper {
+  margin-top: 8px;
+}
+
+.media-img {
+  border-radius: 8px;
+  display: block;
+}
+
+.media-video {
+  border-radius: 8px;
+  display: block;
+}
+
+.media-audio {
+  margin-top: 8px;
+}
+
+.media-unknown {
+  font-style: italic;
+  color: #555;
+}

@@ -1,0 +1,133 @@
+@use "sass:color";
+
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap");
+
+* {
+  $font-family-sans-serif: "DM Sans", sans-serif;
+}
+
+// Theme Colors
+$primary: #2e9ec9;
+$info: #3699ff;
+$danger: #ff5b5b;
+$success: #41c45e;
+$warning: #ffc107;
+$dark: #001e3c;
+$light: #f6faff;
+$secondary: #000000;
+
+$light-primary: #7161ef1f;
+$light-secondary: #d4d4d4;
+$light-success: #41c45e1f;
+$light-info: #3699ff1f;
+$light-warning: #ffc1071f;
+$light-danger: #ff5b5b1f;
+
+$theme-colors: (
+  "primary": $primary,
+  "secondary": $secondary,
+  "success": $success,
+  "info": $info,
+  "warning": $warning,
+  "danger": $danger,
+  "light": $light,
+  "dark": $dark,
+  "light-primary": $light-primary,
+  "light-secondary": $light-secondary,
+  "light-success": $light-success,
+  "light-info": $light-info,
+  "light-warning": $light-warning,
+  "light-danger": $light-danger,
+);
+
+// Gray color variables
+$white: #fff !default;
+$gray-100: #f8f9fa !default;
+$gray-200: #eef5f9 !default;
+$gray-300: #dee2e6 !default;
+$gray-400: #ced4da !default;
+$gray-500: #adb5bd !default;
+$gray-600: #757e85 !default;
+$gray-700: #495057 !default;
+$gray-800: #343a40 !default;
+$gray-900: #1e2a35 !default;
+$black: #000 !default;
+
+// Custom text color
+$text-muted: #959cb1;
+
+// Text contrast
+$min-contrast-ratio: 2;
+
+// Body background & text color
+$body-color: #3a3d42 !default;
+
+// Heading fonts
+$h1-font-size: 36px !default;
+$h2-font-size: 30px !default;
+$h3-font-size: 24px !default;
+$h4-font-size: 18px !default;
+$h5-font-size: 16px !default;
+$h6-font-size: 14px !default;
+
+// Common variables
+$border-radius: 8px !default;
+$box-shadow: 0 0.5rem 0.5rem rgba($black, 0.04);
+$headings-font-weight: 600 !default;
+$font-size-base: 1rem !default;
+$font-weight-bold: 600 !default;
+$h5-font-size: $font-size-base * 1.1 !default;
+$card-border-width: 0 !default;
+$card-box-shadow: $box-shadow !default;
+$grid-gutter-width: 1.85rem !default;
+
+$input-bg: $white !default;
+
+// Progress bars
+$progress-height: 6px !default;
+
+// Buttons
+$btn-focus-width: 0px !default;
+$btn-box-shadow: 0 !default;
+$btn-focus-box-shadow: 0 !default;
+$btn-border-radius: 6px !default;
+$btn-border-radius-sm: 6px !default;
+$btn-font-size-sm: 14px !default;
+$btn-border-width: 0 !default;
+
+// Sidebar
+$sidebarWidth: 260px !default;
+$sidebartext: $gray-900 !default;
+$sidebartextlight: rgba(30, 42, 53, 0.5) !default;
+$miniSidebarWidth: 80px !default;
+$sidebarBgColor: rgb(33 32 53) !default;
+
+// Header
+$topbarHeight: 60px !default;
+$topBarBgColor: rgba(255, 255, 255) !default;
+$topBarBorderColor: rgb(229 233 242) !default;
+
+// Content area
+$pageContentBgColor: rgba(255, 255, 255) !default;
+
+$dropdown-border-width: 0 !default;
+$dropdown-box-shadow: $box-shadow !default;
+$dropdown-link-hover-bg: $gray-100 !default;
+
+$enable-negative-margins: true !default;
+
+$invoicePreviewModalBg: #595959 !default;
+
+$bs-table-bg: #f8f9fa !default;
+$border-color: #dddddd !default;
+$action-hover: #e9ecef !default;
+
+$grid-gutter-width: 1rem !default;
+
+$input-border-radius: 6px !default;
+
+$table-color: $body-color !default;
+$table-border-color: #ddd !default;
+$table-th-font-weight: 500 !default;
+$table-header-bg-color: rgba(160, 168, 189, 0.1) !default;
+$table-cell-vertical-align: middle !default;

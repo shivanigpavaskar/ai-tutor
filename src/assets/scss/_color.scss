@@ -1,0 +1,21 @@
+@use "./variable" as var;
+
+
+.primary-bg-light{
+    background-color: var.$light-primary;
+}
+.secondary-bg-light{
+    background-color: var.$light-secondary;
+}
+.info-bg-light{
+    background-color: var.$light-info;
+}
+.success-bg-light{
+    background-color: var.$light-success;
+}
+.warning-bg-light{
+    background-color: var.$light-warning;
+}
+.danger-bg-light{
+    background-color: var.$light-danger;
+}
