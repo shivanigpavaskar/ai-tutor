@@ -80,7 +80,7 @@ const ChatInterface = () => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const sessionIdRef = useRef<string>(nanoid(12));
   localStorage.setItem("chat_session_id", sessionIdRef.current);
-  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [_isAtBottom, setIsAtBottom] = useState(true);
   const [_unreadCount, setUnreadCount] = useState(0);
   const [hasFetchedInitial, setHasFetchedInitial] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -853,8 +853,7 @@ useEffect(() => {
                     loop
                     playsInline
                     className="ai-speaking-video"
-                    height={"200px"}
-                    width={'200p'}
+                  
                   />
                 </div>
               )}
