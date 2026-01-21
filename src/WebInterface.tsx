@@ -121,25 +121,24 @@ const ChatInterface = () => {
     );
   };
 
-  let selectedVoice: SpeechSynthesisVoice | null = null;
+  const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
 
-  const loadVoices = () => {
-    const voices = window.speechSynthesis.getVoices();
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      selectedVoiceRef.current =
+        voices.find((v) => v.name.toLowerCase().includes("female")) ||
+        voices.find((v) => v.lang.startsWith("en")) ||
+        null;
+    };
 
-    // Try to pick a female English voice
-    selectedVoice =
-      voices.find((v) => v.name.toLowerCase().includes("female")) ||
-      voices.find((v) => v.name.toLowerCase().includes("woman")) ||
-      voices.find((v) => v.lang.startsWith("en")) ||
-      null;
-  };
-
-  // Load voices (some browsers load async)
-  window.speechSynthesis.onvoiceschanged = loadVoices;
-  loadVoices();
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
 
   const speakText = (text: string) => {
-    if (!window.speechSynthesis) return;
+    const synth = window.speechSynthesis;
+    if (!synth) return;
 
     const cleanText = text.replace(/<[^>]*>/g, "");
     const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -148,20 +147,15 @@ const ChatInterface = () => {
     utterance.rate = 1;
     utterance.pitch = 1.1;
 
-    if (selectedVoice) utterance.voice = selectedVoice;
+    if (selectedVoiceRef.current) {
+      utterance.voice = selectedVoiceRef.current;
+    }
 
-    // 🔹 When speech starts → show video
-    utterance.onstart = () => {
-      setIsSpeaking(true);
-    };
+    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => setIsSpeaking(false);
 
-    // 🔹 When speech ends → hide video
-    utterance.onend = () => {
-      setIsSpeaking(false);
-    };
-
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    synth.cancel();
+    synth.speak(utterance);
   };
 
   const decodeHtml = (html: string): string => {
@@ -820,7 +814,7 @@ const ChatInterface = () => {
               {isSpeaking === true && (
                 <div className="ai-speaking-overlay">
                   <video
-                    src="http://api.conversational-dev.trellissoft.ai/media/TrellissoftAI/chat_interface_media/20260121_120138_Typecast_sample_caitlyn_training.mp4"
+                    src="/women_speaking.mp4"
                     autoPlay
                     muted
                     loop
@@ -863,6 +857,7 @@ const ChatInterface = () => {
                     className="message-input"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
+                    onClick={() => window.speechSynthesis.cancel()}
                     placeholder={pendingFile ? "" : "Write message here..."}
                     onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   />
