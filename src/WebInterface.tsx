@@ -94,6 +94,33 @@ const ChatInterface = () => {
   const [_statusMessages, setStatusMessages] = useState<StatusMessage[]>([]);
   const [_mediaLoader, setMediaLoader] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+ 
+  const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const speechQueueRef = useRef<string[]>([]);
+  const isSpeechPlayingRef = useRef(false);
+
+
+
+
+useEffect(() => {
+  const loadVoices = () => {
+    const voices = window.speechSynthesis.getVoices();
+    selectedVoiceRef.current =
+      voices.find((v) => v.name.toLowerCase().includes("female")) ||
+      voices.find((v) => v.lang.startsWith("en")) ||
+      null;
+  };
+
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+}, []);
+
+
+
+
+
+
+
 
   let offset = 0;
   let allMessages: any[] = [];
@@ -121,42 +148,46 @@ const ChatInterface = () => {
     );
   };
 
-  const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
+ 
+ 
 
-  useEffect(() => {
-    const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      selectedVoiceRef.current =
-        voices.find((v) => v.name.toLowerCase().includes("female")) ||
-        voices.find((v) => v.lang.startsWith("en")) ||
-        null;
-    };
+ const playNextInQueue = () => {
+   if (isSpeechPlayingRef.current) return;
+   if (speechQueueRef.current.length === 0) return;
 
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-  }, []);
+   const text = speechQueueRef.current.shift();
+   if (!text) return;
 
-  const speakText = (text: string) => {
-    const synth = window.speechSynthesis;
-    if (!synth) return;
+   isSpeechPlayingRef.current = true;
 
-    const cleanText = text.replace(/<[^>]*>/g, "");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
+   const cleanText = text.replace(/<[^>]*>/g, "");
+   const utterance = new SpeechSynthesisUtterance(cleanText);
 
-    utterance.lang = "en-US";
-    utterance.rate = 1;
-    utterance.pitch = 1.1;
+   utterance.lang = "en-US";
+   utterance.rate = 1;
+   utterance.pitch = 1.1;
 
-    if (selectedVoiceRef.current) {
-      utterance.voice = selectedVoiceRef.current;
-    }
+   if (selectedVoiceRef.current) {
+     utterance.voice = selectedVoiceRef.current;
+   }
 
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
+   utterance.onstart = () => setIsSpeaking(true);
 
-    synth.cancel();
-    synth.speak(utterance);
-  };
+   utterance.onend = () => {
+     setIsSpeaking(false);
+     isSpeechPlayingRef.current = false;
+     playNextInQueue(); // play next message automatically
+   };
+
+   window.speechSynthesis.speak(utterance);
+ };
+
+
+
+
+
+
+
 
   const decodeHtml = (html: string): string => {
     const txt = document.createElement("textarea");
@@ -551,34 +582,36 @@ const ChatInterface = () => {
   //   };
   // }, []);
 
-  const lastSpokenMessageIdRef = useRef<string | null>(null);
+ 
+ const lastQueuedMessageIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    // find newest unread bot/agent message
-    const newBotMessages = messages.filter(
-      (msg) =>
-        (msg.sender === "bot" || msg.sender === "agent") && msg.id !== "loader",
-    );
+ useEffect(() => {
+   const botMessages = messages.filter(
+     (msg) =>
+       (msg.sender === "bot" || msg.sender === "agent") && msg.id !== "loader",
+   );
 
-    if (newBotMessages.length === 0) return;
+   if (botMessages.length === 0) return;
 
-    const lastMsg = newBotMessages[newBotMessages.length - 1];
+   // Find new messages since last queued
+   const lastQueuedId = lastQueuedMessageIdRef.current;
+   const startIndex = lastQueuedId
+     ? botMessages.findIndex((m) => m.id === lastQueuedId) + 1
+     : 0;
 
-    // avoid speaking same message twice
-    if (lastSpokenMessageIdRef.current === lastMsg.id) return;
+   const newMessages = botMessages.slice(startIndex);
 
-    lastSpokenMessageIdRef.current = lastMsg.id;
+   if (newMessages.length === 0) return;
 
-    // 🔊 Speak it
-    speakText(lastMsg.text);
+   newMessages.forEach((m) => {
+     speechQueueRef.current.push(m.text);
+   });
 
-    if (isAtBottom) {
-      scrollToBottom();
-      setUnreadCount(0);
-    } else {
-      setUnreadCount((prev) => prev + 1);
-    }
-  }, [messages]);
+   lastQueuedMessageIdRef.current = newMessages[newMessages.length - 1].id;
+
+   playNextInQueue();
+ }, [messages]);
+
 
   const noUserMessages =
     messages.filter((m) => m.sender === "user").length === 0;
@@ -811,16 +844,17 @@ const ChatInterface = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {isSpeaking === true && (
+              {isSpeaking && (
                 <div className="ai-speaking-overlay">
                   <video
                     src="/women_speaking.mp4"
                     autoPlay
                     muted
                     loop
+                    playsInline
                     className="ai-speaking-video"
                     height={"200px"}
-                    width={"200px"}
+                    width={'200p'}
                   />
                 </div>
               )}
@@ -857,7 +891,7 @@ const ChatInterface = () => {
                     className="message-input"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    onClick={() => window.speechSynthesis.cancel()}
+                    onClick={() => window.speechSynthesis.cancel()} // unlock speech
                     placeholder={pendingFile ? "" : "Write message here..."}
                     onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   />
