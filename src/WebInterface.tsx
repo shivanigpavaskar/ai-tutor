@@ -557,40 +557,34 @@ const ChatInterface = () => {
   //   };
   // }, []);
 
+  const lastSpokenMessageIdRef = useRef<string | null>(null);
 
+  useEffect(() => {
+    // find newest unread bot/agent message
+    const newBotMessages = messages.filter(
+      (msg) =>
+        (msg.sender === "bot" || msg.sender === "agent") && msg.id !== "loader",
+    );
 
-const lastSpokenMessageIdRef = useRef<string | null>(null);
+    if (newBotMessages.length === 0) return;
 
-useEffect(() => {
-  // find newest unread bot/agent message
-  const newBotMessages = messages.filter(
-    (msg) =>
-      (msg.sender === "bot" || msg.sender === "agent") && msg.id !== "loader",
-  );
+    const lastMsg = newBotMessages[newBotMessages.length - 1];
 
-  if (newBotMessages.length === 0) return;
+    // avoid speaking same message twice
+    if (lastSpokenMessageIdRef.current === lastMsg.id) return;
 
-  const lastMsg = newBotMessages[newBotMessages.length - 1];
+    lastSpokenMessageIdRef.current = lastMsg.id;
 
-  // avoid speaking same message twice
-  if (lastSpokenMessageIdRef.current === lastMsg.id) return;
+    // 🔊 Speak it
+    speakText(lastMsg.text);
 
-  lastSpokenMessageIdRef.current = lastMsg.id;
-
-  // 🔊 Speak it
-  speakText(lastMsg.text);
-
-  if (isAtBottom) {
-    scrollToBottom();
-    setUnreadCount(0);
-  } else {
-    setUnreadCount((prev) => prev + 1);
-  }
-}, [messages]);
-
-
-
-
+    if (isAtBottom) {
+      scrollToBottom();
+      setUnreadCount(0);
+    } else {
+      setUnreadCount((prev) => prev + 1);
+    }
+  }, [messages]);
 
   const noUserMessages =
     messages.filter((m) => m.sender === "user").length === 0;
@@ -826,14 +820,13 @@ useEffect(() => {
               {isSpeaking === true && (
                 <div className="ai-speaking-overlay">
                   <video
-                    src="/women_speaking.mp4"
+                    src="http://api.conversational-dev.trellissoft.ai/media/TrellissoftAI/chat_interface_media/20260121_120138_Typecast_sample_caitlyn_training.mp4"
                     autoPlay
                     muted
                     loop
                     className="ai-speaking-video"
                     height={"200px"}
                     width={"200px"}
-                    
                   />
                 </div>
               )}
