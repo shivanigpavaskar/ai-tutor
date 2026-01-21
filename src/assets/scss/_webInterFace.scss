@@ -430,3 +430,9 @@
   flex: 1;
   min-width: 0;
 }
+.ai-speaking-overlay {
+  position: absolute;
+  right: 20px;
+  bottom: 30px;
+  z-index: 50;
+}

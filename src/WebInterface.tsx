@@ -93,6 +93,7 @@ const ChatInterface = () => {
   const prevStatusRef = useRef<string | null>(null);
   const [_statusMessages, setStatusMessages] = useState<StatusMessage[]>([]);
   const [_mediaLoader, setMediaLoader] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   let offset = 0;
   let allMessages: any[] = [];
@@ -118,6 +119,49 @@ const ChatInterface = () => {
       /<li[^>]*>\s*<p[^>]*>(.*?)<\/p>\s*<\/li>/gi,
       "<li>$1</li>",
     );
+  };
+
+  let selectedVoice: SpeechSynthesisVoice | null = null;
+
+  const loadVoices = () => {
+    const voices = window.speechSynthesis.getVoices();
+
+    // Try to pick a female English voice
+    selectedVoice =
+      voices.find((v) => v.name.toLowerCase().includes("female")) ||
+      voices.find((v) => v.name.toLowerCase().includes("woman")) ||
+      voices.find((v) => v.lang.startsWith("en")) ||
+      null;
+  };
+
+  // Load voices (some browsers load async)
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+  loadVoices();
+
+  const speakText = (text: string) => {
+    if (!window.speechSynthesis) return;
+
+    const cleanText = text.replace(/<[^>]*>/g, "");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+
+    utterance.lang = "en-US";
+    utterance.rate = 1;
+    utterance.pitch = 1.1;
+
+    if (selectedVoice) utterance.voice = selectedVoice;
+
+    // 🔹 When speech starts → show video
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+    };
+
+    // 🔹 When speech ends → hide video
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
   };
 
   const decodeHtml = (html: string): string => {
@@ -481,24 +525,25 @@ const ChatInterface = () => {
     setTimeout(scrollToBottom, 100);
   }, []);
 
-  useEffect(() => {
-    const lastMsg = messages[messages.length - 1];
-    if (
-      lastMsg &&
-      (lastMsg.sender == "bot" || lastMsg.sender == "agent") &&
-      lastMsg.id !== "loader"
-    ) {
-      if (isAtBottom) {
-        scrollToBottom();
-        setUnreadCount(0);
-      } else {
-        setUnreadCount((prev) => prev + 1);
-      }
-    } else {
-      scrollToBottom();
-      setUnreadCount(0);
-    }
-  }, [messages]);
+  // useEffect(() => {
+  //   const lastMsg = messages[messages.length - 1];
+  //   if (
+  //     lastMsg &&
+  //     (lastMsg.sender == "bot" || lastMsg.sender == "agent") &&
+  //     lastMsg.id !== "loader"
+  //   ) {
+  //     speakText(lastMsg.text);
+  //     if (isAtBottom) {
+  //       scrollToBottom();
+  //       setUnreadCount(0);
+  //     } else {
+  //       setUnreadCount((prev) => prev + 1);
+  //     }
+  //   } else {
+  //     scrollToBottom();
+  //     setUnreadCount(0);
+  //   }
+  // }, [messages]);
 
   // useEffect(() => {
   //   const handleBeforeUnload = () =>
@@ -511,6 +556,41 @@ const ChatInterface = () => {
   //     window.removeEventListener("beforeunload", handleBeforeUnload);
   //   };
   // }, []);
+
+
+
+const lastSpokenMessageIdRef = useRef<string | null>(null);
+
+useEffect(() => {
+  // find newest unread bot/agent message
+  const newBotMessages = messages.filter(
+    (msg) =>
+      (msg.sender === "bot" || msg.sender === "agent") && msg.id !== "loader",
+  );
+
+  if (newBotMessages.length === 0) return;
+
+  const lastMsg = newBotMessages[newBotMessages.length - 1];
+
+  // avoid speaking same message twice
+  if (lastSpokenMessageIdRef.current === lastMsg.id) return;
+
+  lastSpokenMessageIdRef.current = lastMsg.id;
+
+  // 🔊 Speak it
+  speakText(lastMsg.text);
+
+  if (isAtBottom) {
+    scrollToBottom();
+    setUnreadCount(0);
+  } else {
+    setUnreadCount((prev) => prev + 1);
+  }
+}, [messages]);
+
+
+
+
 
   const noUserMessages =
     messages.filter((m) => m.sender === "user").length === 0;
@@ -621,13 +701,15 @@ const ChatInterface = () => {
 
             <div className="recent-chat-item">
               <div>
-                <p className="chat-title">Photosynthesis explained</p>
+                <p className="chat-title"> What Is Photosynthesis ? </p>
                 <h6 className="chat-date">Today</h6>
               </div>
             </div>
             <div className="recent-chat-item">
               <div>
-                <p className="chat-title">Quadratic equations help</p>
+                <p className="chat-title">
+                  Help me to solve this Quadratic equation
+                </p>
                 <h6 className="chat-date">Yesterday</h6>
               </div>
             </div>
@@ -636,9 +718,9 @@ const ChatInterface = () => {
 
         <main className="ai-main">
           {/* ===== Chat Area ===== */}
+
           <section className="ai-chat-container">
             <div className="chat-wrapper">
-              {/* ===== Chat Body ===== */}
               <div
                 className="chat-body"
                 ref={chatBodyRef}
@@ -740,6 +822,21 @@ const ChatInterface = () => {
 
                 <div ref={messagesEndRef} />
               </div>
+
+              {isSpeaking === true && (
+                <div className="ai-speaking-overlay">
+                  <video
+                    src="/women_speaking.mp4"
+                    autoPlay
+                    muted
+                    loop
+                    className="ai-speaking-video"
+                    height={"200px"}
+                    width={"200px"}
+                    
+                  />
+                </div>
+              )}
 
               {/* ===== Input Bar ===== */}
               <div className="chat-input">
