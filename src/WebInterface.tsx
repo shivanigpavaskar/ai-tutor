@@ -6,7 +6,6 @@ import "./assets/scss/_aiTutorLayout.scss";
 import Chatbot from "./assets/Chat-icon.png";
 import Agent from "./assets/live-agent-icon.png";
 import { HiOutlineAcademicCap, HiOutlineBookOpen } from "react-icons/hi2";
-
 import toast from "react-hot-toast";
 import { BiSend } from "react-icons/bi";
 import config from "./config.json";
@@ -99,28 +98,48 @@ const ChatInterface = () => {
   const speechQueueRef = useRef<string[]>([]);
   const isSpeechPlayingRef = useRef(false);
 
+  useEffect(() => {
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
 
+      // Priority list of known female voices across browsers
+      const preferredFemaleNames = [
+        // Edge / Windows
+        "Microsoft Aria",
+        "Microsoft Jenny",
+        "Microsoft Sonia",
+        "Microsoft Natasha",
+        "Microsoft Zira",
 
+        // Chrome
+        "Google UK English Female",
+        "Google US English",
 
-useEffect(() => {
-  const loadVoices = () => {
-    const voices = window.speechSynthesis.getVoices();
-    selectedVoiceRef.current =
-      voices.find((v) => v.name.toLowerCase().includes("female")) ||
-      voices.find((v) => v.lang.startsWith("en")) ||
-      null;
-  };
+        // Safari
+        "Samantha",
+        "Karen",
+        "Tessa",
+      ];
 
-  loadVoices();
-  window.speechSynthesis.onvoiceschanged = loadVoices;
-}, []);
+      let selected =
+        voices.find((v) =>
+          preferredFemaleNames.some((name) =>
+            v.name.toLowerCase().includes(name.toLowerCase()),
+          ),
+        ) ||
+        // fallback: any voice explicitly containing female
+        voices.find((v) => /female|woman/i.test(v.name)) ||
+        // final fallback: first English voice
+        voices.find((v) => v.lang.startsWith("en")) ||
+        null;
 
+      selectedVoiceRef.current = selected;
 
+     };
 
-
-
-
-
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }, []);
 
   let offset = 0;
   let allMessages: any[] = [];
@@ -148,46 +167,36 @@ useEffect(() => {
     );
   };
 
- 
- 
+  const playNextInQueue = () => {
+    if (isSpeechPlayingRef.current) return;
+    if (speechQueueRef.current.length === 0) return;
 
- const playNextInQueue = () => {
-   if (isSpeechPlayingRef.current) return;
-   if (speechQueueRef.current.length === 0) return;
+    const text = speechQueueRef.current.shift();
+    if (!text) return;
 
-   const text = speechQueueRef.current.shift();
-   if (!text) return;
+    isSpeechPlayingRef.current = true;
 
-   isSpeechPlayingRef.current = true;
+    const cleanText = text.replace(/<[^>]*>/g, "");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
 
-   const cleanText = text.replace(/<[^>]*>/g, "");
-   const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = "en-US";
+    utterance.rate = 1;
+    utterance.pitch = 1.1;
 
-   utterance.lang = "en-US";
-   utterance.rate = 1;
-   utterance.pitch = 1.1;
+    if (selectedVoiceRef.current) {
+      utterance.voice = selectedVoiceRef.current;
+    }
 
-   if (selectedVoiceRef.current) {
-     utterance.voice = selectedVoiceRef.current;
-   }
+    utterance.onstart = () => setIsSpeaking(true);
 
-   utterance.onstart = () => setIsSpeaking(true);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      isSpeechPlayingRef.current = false;
+      playNextInQueue(); // play next message automatically
+    };
 
-   utterance.onend = () => {
-     setIsSpeaking(false);
-     isSpeechPlayingRef.current = false;
-     playNextInQueue(); // play next message automatically
-   };
-
-   window.speechSynthesis.speak(utterance);
- };
-
-
-
-
-
-
-
+    window.speechSynthesis.speak(utterance);
+  };
 
   const decodeHtml = (html: string): string => {
     const txt = document.createElement("textarea");
@@ -582,36 +591,34 @@ useEffect(() => {
   //   };
   // }, []);
 
- 
- const lastQueuedMessageIdRef = useRef<string | null>(null);
+  const lastQueuedMessageIdRef = useRef<string | null>(null);
 
- useEffect(() => {
-   const botMessages = messages.filter(
-     (msg) =>
-       (msg.sender === "bot" || msg.sender === "agent") && msg.id !== "loader",
-   );
+  useEffect(() => {
+    const botMessages = messages.filter(
+      (msg) =>
+        (msg.sender === "bot" || msg.sender === "agent") && msg.id !== "loader",
+    );
 
-   if (botMessages.length === 0) return;
+    if (botMessages.length === 0) return;
 
-   // Find new messages since last queued
-   const lastQueuedId = lastQueuedMessageIdRef.current;
-   const startIndex = lastQueuedId
-     ? botMessages.findIndex((m) => m.id === lastQueuedId) + 1
-     : 0;
+    // Find new messages since last queued
+    const lastQueuedId = lastQueuedMessageIdRef.current;
+    const startIndex = lastQueuedId
+      ? botMessages.findIndex((m) => m.id === lastQueuedId) + 1
+      : 0;
 
-   const newMessages = botMessages.slice(startIndex);
+    const newMessages = botMessages.slice(startIndex);
 
-   if (newMessages.length === 0) return;
+    if (newMessages.length === 0) return;
 
-   newMessages.forEach((m) => {
-     speechQueueRef.current.push(m.text);
-   });
+    newMessages.forEach((m) => {
+      speechQueueRef.current.push(m.text);
+    });
 
-   lastQueuedMessageIdRef.current = newMessages[newMessages.length - 1].id;
+    lastQueuedMessageIdRef.current = newMessages[newMessages.length - 1].id;
 
-   playNextInQueue();
- }, [messages]);
-
+    playNextInQueue();
+  }, [messages]);
 
   const noUserMessages =
     messages.filter((m) => m.sender === "user").length === 0;
@@ -682,6 +689,19 @@ useEffect(() => {
       prevStatusRef.current = currentStatus;
     }
   }, [currentStatus]);
+
+useEffect(() => {
+  if (!chatBodyRef.current) return;
+
+  const el = chatBodyRef.current;
+
+   el.scrollTo({
+    top: el.scrollHeight,
+    behavior: "smooth",
+  });
+}, [messages]);
+
+
 
   return (
     <div className="ai-tutor-app">
@@ -852,9 +872,10 @@ useEffect(() => {
                     muted
                     loop
                     playsInline
-                    className="ai-speaking-video"
-                  
-                  />
+                    height={'200px'}
+                    width={'200px'}
+                    style={{borderRadius:'30px'}}
+                    />
                 </div>
               )}
 
