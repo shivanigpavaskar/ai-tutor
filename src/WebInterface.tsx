@@ -14,6 +14,7 @@ import JSON5 from "json5";
 import DOMPurify from "dompurify";
 import { FiPaperclip, FiX } from "react-icons/fi";
 import he from "he";
+import { MdOutlineKeyboardVoice } from "react-icons/md";
 
 const SESSION_KEY = "chat_session_id";
 const SESSION_TIMESTAMP_KEY = "chat_session_created_at";
@@ -872,10 +873,10 @@ useEffect(() => {
                     muted
                     loop
                     playsInline
-                    height={'200px'}
-                    width={'200px'}
-                    style={{borderRadius:'30px'}}
-                    />
+                    height={"200px"}
+                    width={"200px"}
+                    style={{ borderRadius: "30px" }}
+                  />
                 </div>
               )}
 
@@ -915,6 +916,9 @@ useEffect(() => {
                     placeholder={pendingFile ? "" : "Write message here..."}
                     onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   />
+                  <button className="voice-btn">
+                    <MdOutlineKeyboardVoice />
+                  </button>
                   <button
                     className="attach-btn"
                     onClick={() => fileInputRef.current?.click()}
