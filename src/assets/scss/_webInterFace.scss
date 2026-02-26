@@ -59,7 +59,8 @@
 .logo-title {
   font-size: 14px;
   font-weight: 600;
-  color: #111827;
+  color: #111827; 
+  left: 10px;
 }
 
 .logo-subtitle {
@@ -444,10 +445,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #7c3aed;
+  color: white;
+  background-color: #00c951;
   font-size: 23px;           
   cursor: pointer;
   transition: background 0.2s ease;
 }
 
- 
+/* Floating Avatar (Bottom-Left Assistant Style) */
+.avatar-floating {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  width: 260px;
+  height: 260px;
+  z-index: 9999;
+  /* Prevent blocking chat clicks */
+  pointer-events: none;
+}
+
+/* Allow controls inside avatar if needed */
+.avatar-floating button {
+  pointer-events: auto;
+}
+
+/* Remove big background from AvatarPlayer */
+.avatar-floating .flex {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
