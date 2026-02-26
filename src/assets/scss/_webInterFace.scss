@@ -8,8 +8,9 @@
 /* ===== Root Layout ===== */
 
 .ai-tutor-app {
-  // display: flex;
-  // height: 96vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   font-family: "DM Sans", sans-serif;
   background: #f8fafc;
   overflow: hidden;
@@ -432,7 +433,8 @@
 }
 .ai-speaking-overlay {
   position: absolute;
-  right: 40px;
+  // right: 40px;
+  left: 10px;
   bottom: 85px;
   z-index: 50;
   }

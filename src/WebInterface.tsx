@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from "react";
 import { nanoid } from "nanoid";
 import ChatFlowService from "./service/chatflow.service";
@@ -15,7 +16,7 @@ import DOMPurify from "dompurify";
 import { FiPaperclip, FiX } from "react-icons/fi";
 import he from "he";
 import { MdOutlineKeyboardVoice } from "react-icons/md";
-
+ 
 const SESSION_KEY = "chat_session_id";
 const SESSION_TIMESTAMP_KEY = "chat_session_created_at";
 const MAX_AGE_MS = 60 * 60 * 1000;
@@ -65,6 +66,7 @@ interface Message {
   media_url?: string;
   media_type?: string;
   media_caption?: string;
+  audio_base64?: string;
 }
 interface StatusMessage {
   index: number;
@@ -93,54 +95,9 @@ const ChatInterface = () => {
   const prevStatusRef = useRef<string | null>(null);
   const [_statusMessages, setStatusMessages] = useState<StatusMessage[]>([]);
   const [_mediaLoader, setMediaLoader] = useState(false);
+  const [avatarAudio, setAvatarAudio] = useState<string | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
- 
-  const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
-  const speechQueueRef = useRef<string[]>([]);
-  const isSpeechPlayingRef = useRef(false);
-
-  useEffect(() => {
-    const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-
-      // Priority list of known female voices across browsers
-      const preferredFemaleNames = [
-        // Edge / Windows
-        "Microsoft Aria",
-        "Microsoft Jenny",
-        "Microsoft Sonia",
-        "Microsoft Natasha",
-        "Microsoft Zira",
-
-        // Chrome
-        "Google UK English Female",
-        "Google US English",
-
-        // Safari
-        "Samantha",
-        "Karen",
-        "Tessa",
-      ];
-
-      let selected =
-        voices.find((v) =>
-          preferredFemaleNames.some((name) =>
-            v.name.toLowerCase().includes(name.toLowerCase()),
-          ),
-        ) ||
-        // fallback: any voice explicitly containing female
-        voices.find((v) => /female|woman/i.test(v.name)) ||
-        // final fallback: first English voice
-        voices.find((v) => v.lang.startsWith("en")) ||
-        null;
-
-      selectedVoiceRef.current = selected;
-
-     };
-
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-  }, []);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   let offset = 0;
   let allMessages: any[] = [];
@@ -168,37 +125,6 @@ const ChatInterface = () => {
     );
   };
 
-  const playNextInQueue = () => {
-    if (isSpeechPlayingRef.current) return;
-    if (speechQueueRef.current.length === 0) return;
-
-    const text = speechQueueRef.current.shift();
-    if (!text) return;
-
-    isSpeechPlayingRef.current = true;
-
-    const cleanText = text.replace(/<[^>]*>/g, "");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-
-    utterance.lang = "en-US";
-    utterance.rate = 1;
-    utterance.pitch = 1.1;
-
-    if (selectedVoiceRef.current) {
-      utterance.voice = selectedVoiceRef.current;
-    }
-
-    utterance.onstart = () => setIsSpeaking(true);
-
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      isSpeechPlayingRef.current = false;
-      playNextInQueue(); // play next message automatically
-    };
-
-    window.speechSynthesis.speak(utterance);
-  };
-
   const decodeHtml = (html: string): string => {
     const txt = document.createElement("textarea");
     txt.innerHTML = html;
@@ -221,7 +147,102 @@ const ChatInterface = () => {
     }
   };
 
+  // const fetchBotResponse = async (message: string, mediaType?: string) => {
+  //   try {
+  //     const payload: any = {
+  //       session_id: sessionIdRef.current,
+  //       message,
+  //     };
+
+  //     if (mediaType) {
+  //       payload.media_type = mediaType;
+  //     }
+
+  //     const response = await chatflowService.chatflow(
+  //       config.accountName,
+  //       payload,
+  //     );
+  //     const botDataArray = response.data.response;
+
+  //     const isProcessing =
+  //       (Array.isArray(botDataArray) &&
+  //         botDataArray[0] === "Message is being processed...") ||
+  //       botDataArray === "Message is being processed...";
+
+  //     if (isProcessing) {
+  //       const loaderMessage: Message = {
+  //         id: "loader",
+  //         sender: "bot",
+  //         text: "Loader",
+  //         time: new Date().toLocaleTimeString([], {
+  //           hour: "2-digit",
+  //           minute: "2-digit",
+  //         }),
+  //       };
+
+  //       setMessages((prev) => {
+  //         const withoutLoader = prev.filter((msg) => msg.id !== "loader");
+  //         return [...withoutLoader, loaderMessage];
+  //       });
+
+  //       return;
+  //     }
+
+  //     setMessages((prev) => prev.filter((msg) => msg.id !== "loader"));
+
+  //     if (Array.isArray(botDataArray)) {
+  //       const newMessages: Message[] = botDataArray.map(
+  //         (item: any): Message => {
+  //           const isText = typeof item === "string";
+  //           const msgContent = isText
+  //             ? item
+  //             : item.message || JSON.stringify(item);
+
+  //           return {
+  //             id: nanoid(12),
+  //             sender: item.sender === "agent" ? "agent" : "bot",
+  //             text: String(msgContent),
+  //             time: new Date().toLocaleTimeString([], {
+  //               hour: "2-digit",
+  //               minute: "2-digit",
+  //             }),
+  //             buttons:
+  //               !isText && item.buttons
+  //                 ? item.buttons.map((btn: any) => ({
+  //                     label: btn.title,
+  //                     payload: btn.payload,
+  //                   }))
+  //                 : undefined,
+  //             media_url: !isText ? item.media_url : undefined,
+  //             media_type: !isText ? item.media_type : undefined,
+  //             media_caption: !isText ? item.media_caption : undefined,
+  //           };
+  //         },
+  //       );
+  //       setMessages((prev) => [...prev, ...newMessages]);
+
+  //     } else if (typeof botDataArray === "string") {
+  //       const newMessage: Message = {
+  //         id: nanoid(12),
+  //         sender: "bot",
+  //         text: botDataArray,
+  //         time: new Date().toLocaleTimeString([], {
+  //           hour: "2-digit",
+  //           minute: "2-digit",
+  //         }),
+  //       };
+  //       setMessages((prev) => [...prev, newMessage]);
+  //     }
+
+  //     await checkNotificationCount();
+  //   } catch (error: any) {
+  //     toast.error(error.response?.data?.message);
+  //   }
+  // };
+
   const fetchBotResponse = async (message: string, mediaType?: string) => {
+    console.log("fetchBotResponse CALLED");
+
     try {
       const payload: any = {
         session_id: sessionIdRef.current,
@@ -236,6 +257,7 @@ const ChatInterface = () => {
         config.accountName,
         payload,
       );
+
       const botDataArray = response.data.response;
 
       const isProcessing =
@@ -243,6 +265,7 @@ const ChatInterface = () => {
           botDataArray[0] === "Message is being processed...") ||
         botDataArray === "Message is being processed...";
 
+      // ✅ SHOW LOADER MESSAGE
       if (isProcessing) {
         const loaderMessage: Message = {
           id: "loader",
@@ -262,8 +285,10 @@ const ChatInterface = () => {
         return;
       }
 
+      // ✅ REMOVE LOADER
       setMessages((prev) => prev.filter((msg) => msg.id !== "loader"));
 
+      // ✅ CASE 1 — ARRAY RESPONSE (Most Common)
       if (Array.isArray(botDataArray)) {
         const newMessages: Message[] = botDataArray.map(
           (item: any): Message => {
@@ -290,11 +315,16 @@ const ChatInterface = () => {
               media_url: !isText ? item.media_url : undefined,
               media_type: !isText ? item.media_type : undefined,
               media_caption: !isText ? item.media_caption : undefined,
+              audio_base64: item.audio_base64,
             };
           },
         );
+
         setMessages((prev) => [...prev, ...newMessages]);
-      } else if (typeof botDataArray === "string") {
+      }
+
+      // ✅ CASE 2 — STRING RESPONSE
+      else if (typeof botDataArray === "string") {
         const newMessage: Message = {
           id: nanoid(12),
           sender: "bot",
@@ -303,7 +333,10 @@ const ChatInterface = () => {
             hour: "2-digit",
             minute: "2-digit",
           }),
+          audio_base64:
+            response.data.audio_base64 || response.data.audio_base_64,
         };
+
         setMessages((prev) => [...prev, newMessage]);
       }
 
@@ -312,6 +345,7 @@ const ChatInterface = () => {
       toast.error(error.response?.data?.message);
     }
   };
+
   const stripHtmlTags = (value: string): string => {
     const temp = document.createElement("div");
     temp.innerHTML = value;
@@ -503,6 +537,7 @@ const ChatInterface = () => {
                     media_type: entry.media_type,
                     media_caption:
                       entry.caption || entry.media_caption || undefined,
+                    audio_base64: item.audio_base64,
                   });
                 });
                 handled = true;
@@ -518,6 +553,7 @@ const ChatInterface = () => {
                   media_url: parsed.media_url,
                   media_type: parsed.media_type,
                   media_caption: parsed.caption,
+                  audio_base64: item.audio_base64,
                 });
               } catch (e) {}
             }
@@ -528,6 +564,7 @@ const ChatInterface = () => {
                 sender: item.sender === "agent" ? "agent" : "bot",
                 text: raw,
                 time,
+                audio_base64: item.audio_base64,
               });
             }
           }
@@ -592,34 +629,111 @@ const ChatInterface = () => {
   //   };
   // }, []);
 
-  const lastQueuedMessageIdRef = useRef<string | null>(null);
-
+  const processedIdsRef = useRef<Set<string>>(new Set());
+  const speechQueueRef = useRef<{ text: string; audio: string | null }[]>([]);
+  const isSpeakingRef = useRef(false);
   useEffect(() => {
     const botMessages = messages.filter(
       (msg) =>
-        (msg.sender === "bot" || msg.sender === "agent") && msg.id !== "loader",
+        (msg.sender === "bot" || msg.sender === "agent") &&
+        msg.id !== "loader" &&
+        msg.text &&
+        !processedIdsRef.current.has(msg.id),
     );
 
     if (botMessages.length === 0) return;
 
-    // Find new messages since last queued
-    const lastQueuedId = lastQueuedMessageIdRef.current;
-    const startIndex = lastQueuedId
-      ? botMessages.findIndex((m) => m.id === lastQueuedId) + 1
-      : 0;
+    botMessages.forEach((msg) => {
+      speechQueueRef.current.push({
+        text: msg.text,
+        audio: msg.audio_base64 || null,
+      });
 
-    const newMessages = botMessages.slice(startIndex);
-
-    if (newMessages.length === 0) return;
-
-    newMessages.forEach((m) => {
-      speechQueueRef.current.push(m.text);
+      processedIdsRef.current.add(msg.id);
     });
 
-    lastQueuedMessageIdRef.current = newMessages[newMessages.length - 1].id;
-
-    playNextInQueue();
+    processSpeechQueue();
   }, [messages]);
+
+  const fetchElevenLabsTTS = async (text: string) => {
+    try {
+      const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
+      if (!apiKey) {
+        console.error("ElevenLabs API Key is missing in .env (VITE_ELEVENLABS_API_KEY)");
+        throw new Error("API Key missing");
+      }
+      const voiceId = "v7UCHHCrHj1KBa4E41gb"; 
+      
+      const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, { 
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json",
+          "xi-api-key": apiKey
+        },
+        body: JSON.stringify({ 
+          text,
+          model_id: "eleven_multilingual_v2",
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.8
+          }
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        const msg = errorData.detail?.message || "TTS failed";
+        toast.error(`ElevenLabs: ${msg}`);
+        console.error("ElevenLabs Error Details:", errorData);
+        throw new Error(msg);
+      }
+
+      const blob = await response.blob();
+      const reader = new FileReader();
+      return new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const base64data = reader.result as string;
+          resolve(base64data.split(",")[1]); // Return raw base64
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (err) {
+      console.error("ElevenLabs TTS Error:", err);
+      return null;
+    }
+  };
+
+  const processSpeechQueue = async () => {
+    if (isSpeakingRef.current) return;
+    if (speechQueueRef.current.length === 0) {
+      setIsSpeaking(false);
+      return;
+    }
+
+    const next = speechQueueRef.current.shift();
+    if (!next) return;
+
+    isSpeakingRef.current = true;
+    
+    let audio = next.audio;
+    if (!audio) {
+      audio = await fetchElevenLabsTTS(next.text);
+    }
+
+    if (audio) {
+      setAvatarAudio(audio);
+    } else {
+      isSpeakingRef.current = false;
+      setIsSpeaking(false);
+      processSpeechQueue();
+    }
+  };
+
+  const handleSpeechEnd = () => {
+    isSpeakingRef.current = false;
+    setIsSpeaking(false);
+    processSpeechQueue();
+  };
 
   const noUserMessages =
     messages.filter((m) => m.sender === "user").length === 0;
@@ -691,151 +805,83 @@ const ChatInterface = () => {
     }
   }, [currentStatus]);
 
-useEffect(() => {
-  if (!chatBodyRef.current) return;
-
-  const el = chatBodyRef.current;
-
-   el.scrollTo({
-    top: el.scrollHeight,
-    behavior: "smooth",
-  });
-}, [messages]);
-
-
+  useEffect(() => {
+    if (chatBodyRef.current) {
+      chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   return (
     <div className="ai-tutor-app">
       <header className="ai-topbar">
-        <div className="ai-logo">
-          <HiOutlineAcademicCap className="logo-icon" />
-
-          <div className="logo-text">
-            <span className="logo-title">AI Tutor</span>
-            <h6 className="logo-subtitle">Let's learn together! 🚀</h6>
-          </div>
-        </div>
-
         <span>⚙️</span>
+        <div className="ai-logo">
+          <div className="logo-text">
+            <span className="logo-title">المعلم الذكي</span>
+            <h6 className="logo-subtitle">🚀 لنتعلم معًا!</h6>
+          </div>
+          <HiOutlineAcademicCap className="logo-icon" />
+        </div>
       </header>
 
       <div className="main-container">
-        <aside className="ai-sidebar">
-          <button className="new-chat-btn">+ Start New Chat</button>
-
-          <div className="sidebar-section">
-            <p className="sidebar-title">Pick a Subject</p>
-            <ul>
-              <li className="active"> 🔬 Science</li>
-              <li>📐 Mathematics</li>
-              <li>📖 Literature</li>
-              <li>🌍 History</li>
-            </ul>
-          </div>
-
-          <div className="sidebar-section">
-            <p className="sidebar-title">Choose Lesson/Chapter</p>
-            <div className="static-pill">Biology</div>
-          </div>
-
-          <div className="sidebar-section">
-            <p className="sidebar-title"> 💭 Your Recent Chats</p>
-
-            <div className="recent-chat-item">
-              <div>
-                <p className="chat-title"> What Is Photosynthesis ? </p>
-                <h6 className="chat-date">Today</h6>
-              </div>
-            </div>
-            <div className="recent-chat-item">
-              <div>
-                <p className="chat-title">
-                  Help me to solve this Quadratic equation
-                </p>
-                <h6 className="chat-date">Yesterday</h6>
-              </div>
-            </div>
-          </div>
-        </aside>
-
         <main className="ai-main">
-          {/* ===== Chat Area ===== */}
-
           <section className="ai-chat-container">
-            <div className="chat-wrapper">
+            <div className="chat-wrapper" dir="rtl">
               <div
                 className="chat-body"
                 ref={chatBodyRef}
                 onScroll={handleScroll}
               >
-                {/* ===== Welcome Screen ===== */}
                 {noUserMessages && (
-                  <div className="welcome-screen">
+                  <div className="welcome-screen" dir="rtl">
                     <div className="welcome-icon">
                       <HiOutlineBookOpen />
                     </div>
-                    <h2>Hey there! Ready to learn? 👋</h2>
+                    <h2>مرحبًا! هل أنت مستعد للتعلّم؟ 👋</h2>
                     <p>
-                      I'm your friendly AI tutor, here to help you understand
-                      anything! Ask me questions, get homework help, or practice
-                      for your next test.
+                      أنا معلمك الذكي الودود، هنا لمساعدتك على فهم أي شيء!
+                      اسألني أسئلة، احصل على مساعدة في واجباتك، أو تدرب للاختبار
+                      القادم.
                     </p>
-
                     <div className="suggestions">
-                      <div>💡 "Explain photosynthesis like I'm 10"</div>
-                      <div>📐 "Help me solve x² + 5x + 6 = 0"</div>
-                      <div>🎯 "Quiz me on the American Revolution"</div>
+                      <div>💡 "اشرح عملية البناء الضوئي وكأن عمري 10 سنوات"</div>
+                      <div>📐 "ساعدني في حل المعادلة x² + 5x + 6 = 0"</div>
+                      <div>🎯 "اختبرني في الثورة الأمريكية"</div>
                     </div>
-
                     <div className="quick-actions">
-                      <button disabled>✨ Explain this simply</button>
-                      <button disabled>📝 Help with homework</button>
-                      <button disabled>🎯 Quiz me!</button>
+                      <button disabled>✨ اشرح هذا ببساطة</button>
+                      <button disabled>📝 المساعدة في الواجبات</button>
+                      <button disabled>🎯 اختبرني!</button>
                     </div>
                   </div>
                 )}
 
-                {/* ===== Messages ===== */}
                 {messages.map((msg, index) => {
                   const previousMessage = messages[index - 1];
-                  const isSameSender =
-                    previousMessage && previousMessage.sender === msg.sender;
-
-                  const extractMinute = (time?: string) =>
-                    time ? time.split(":").slice(0, 2).join(":") : null;
-
+                  const isSameSender = previousMessage && previousMessage.sender === msg.sender;
+                  const extractMinute = (time?: string) => time ? time.split(":").slice(0, 2).join(":") : null;
                   const currentMinute = extractMinute(msg.time);
-                  const previousMinute = previousMessage
-                    ? extractMinute(previousMessage.time)
-                    : null;
-
-                  const shouldShowHeader =
-                    !isSameSender || currentMinute !== previousMinute;
+                  const previousMinute = previousMessage ? extractMinute(previousMessage.time) : null;
+                  const shouldShowHeader = !isSameSender || currentMinute !== previousMinute;
 
                   return (
                     <div key={msg.id} className={`chat-message ${msg.sender}`}>
                       {msg.sender !== "user" && shouldShowHeader && (
                         <div className="bot-meta">
-                          <img
-                            src={msg.sender === "agent" ? Agent : Chatbot}
-                            className="bot-avatar"
-                          />
+                          <img src={msg.sender === "agent" ? Agent : Chatbot} className="bot-avatar" />
                           <span className="bot-agent-time">{msg.time}</span>
                         </div>
                       )}
-
                       {msg.sender === "user" && shouldShowHeader && (
                         <div className="user-meta">
                           <span className="time">{msg.time}</span>
                         </div>
                       )}
-
                       <div className="text">
                         {msg.text === "Loader" ? (
                           <div className="dot-loader">
-                            <span></span>
-                            <span></span>
-                            <span></span>
+                            <span></span><span></span><span></span>
                           </div>
                         ) : msg.media_url && isUrl(msg.media_url) ? (
                           <MediaRenderer
@@ -849,10 +895,7 @@ useEffect(() => {
                             className="bot-text"
                             dangerouslySetInnerHTML={{
                               __html: DOMPurify.sanitize(
-                                stripPTags(he.decode(msg.text)).replace(
-                                  /\n/g,
-                                  "<br/>",
-                                ),
+                                stripPTags(he.decode(msg.text)).replace(/\n/g, "<br/>"),
                               ),
                             }}
                           />
@@ -861,72 +904,60 @@ useEffect(() => {
                     </div>
                   );
                 })}
-
                 <div ref={messagesEndRef} />
               </div>
+
+              {avatarAudio && (
+                <audio
+                  ref={audioRef}
+                  src={`data:audio/mp3;base64,${avatarAudio}`}
+                  autoPlay
+                  onPlay={() => setIsSpeaking(true)}
+                  onEnded={handleSpeechEnd}
+                  onError={handleSpeechEnd}
+                  style={{ display: "none" }}
+                />
+              )}
 
               {isSpeaking && (
                 <div className="ai-speaking-overlay">
                   <video
                     src="/women_speaking.mp4"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    height={"200px"}
-                    width={"200px"}
-                    style={{ borderRadius: "30px" }}
+                    autoPlay muted loop playsInline
+                    className="avatar-video"
+                    style={{
+                      borderRadius: "30px", width: "200px", height: "200px", objectFit: "cover"
+                    }}
                   />
                 </div>
               )}
 
-              {/* ===== Input Bar ===== */}
               <div className="chat-input">
                 <div className="input-container">
+                  <button className="attach-btn" onClick={() => fileInputRef.current?.click()}>
+                    <FiPaperclip size={18} />
+                  </button>
+                  <input type="file" ref={fileInputRef} hidden onChange={handleMediaUpload} />
                   {filePreviewUrl && pendingFile && (
                     <div className="inline-preview">
                       <span>📄</span>
-                      <span className="file-name">
-                        {getCleanFileName(pendingFile.name)}
-                      </span>
-                      <button
-                        className="cancel-btn"
-                        onClick={() => {
-                          setPendingFile(null);
-                          setFilePreviewUrl(null);
-                        }}
-                      >
+                      <span className="file-name">{getCleanFileName(pendingFile.name)}</span>
+                      <button className="cancel-btn" onClick={() => { setPendingFile(null); setFilePreviewUrl(null); }}>
                         <FiX size={14} />
                       </button>
                     </div>
                   )}
-
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    hidden
-                    onChange={handleMediaUpload}
-                  />
-
                   <input
                     className="message-input"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    onClick={() => window.speechSynthesis.cancel()} // unlock speech
-                    placeholder={pendingFile ? "" : "Write message here..."}
+                    placeholder={pendingFile ? "" : "اسألني أي شيء! أنا هنا لمساعدتك على التعلم 😊"}
                     onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   />
                   <button className="voice-btn">
                     <MdOutlineKeyboardVoice />
                   </button>
-                  <button
-                    className="attach-btn"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <FiPaperclip size={18} />
-                  </button>
                 </div>
-
                 <button className="send-btn" onClick={() => handleSend()}>
                   <BiSend />
                 </button>
@@ -934,9 +965,58 @@ useEffect(() => {
             </div>
           </section>
         </main>
+        <div>
+          <aside className="ai-sidebar">
+            <button className="new-chat-btn">+ ابدأ محادثة جديدة</button>
+            <div className="sidebar-section">
+              <p className="sidebar-title">اختر المادة</p>
+              <ul>
+                <li className="active"> 🔬 العلوم</li>
+                <li>📐 الرياضيات</li>
+                <li>📖 الأدب</li>
+                <li>🌍 التاريخ</li>
+              </ul>
+            </div>
+            <div className="sidebar-section">
+              <p className="sidebar-title">اختر الدرس / الفصل</p>
+              <div className="static-pill">الأحياء</div>
+            </div>
+            <div className="sidebar-section">
+              <p className="sidebar-title">💭 محادثاتك الأخيرة</p>
+              <div className="recent-chat-item">
+                <div>
+                  <p className="chat-title">ما هو التمثيل الضوئي؟</p>
+                  <h6 className="chat-date">اليوم</h6>
+                </div>
+              </div>
+              <div className="recent-chat-item">
+                <div>
+                  <p className="chat-title">اشرح مفهوم الطاقة الحركية</p>
+                  <h6 className="chat-date">اليوم</h6>
+                </div>
+              </div>
+              <div className="recent-chat-item">
+                <div>
+                  <p className="chat-title">اشرح لي دورة حياة الخلية</p>
+                  <h6 className="chat-date">أمس</h6>
+                </div>
+              </div>
+              <div className="recent-chat-item">
+                <div>
+                  <p className="chat-title">ساعدني في حل المعادلات التربيعية</p>
+                  <h6 className="chat-date">أمس</h6>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   );
 };
 
 export default ChatInterface;
+
+
+
+

@@ -7,5 +7,12 @@ export default defineConfig({
   base: "./",
   server: {
     port: 3000,
+    proxy: {
+      "/api/v1": {
+        target: "https://api.conversational-dev.trellissoft.ai",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/v1/, "/api/v1"), // keep the path
+      },
+    },
   },
 });
