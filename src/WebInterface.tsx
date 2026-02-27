@@ -94,7 +94,7 @@ const ChatInterface = () => {
   const [_statusMessages, setStatusMessages] = useState<StatusMessage[]>([]);
   const [_mediaLoader, setMediaLoader] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
- 
+
   const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const speechQueueRef = useRef<string[]>([]);
   const isSpeechPlayingRef = useRef(false);
@@ -105,21 +105,33 @@ const ChatInterface = () => {
 
       // Priority list of known female voices across browsers
       const preferredFemaleNames = [
-        // Edge / Windows
+        // Microsoft (Edge) - Best quality
+        "Microsoft Salma Online",
+        "Microsoft Zariyah Online",
+        "Microsoft Hoda Online",
+        "Microsoft Amany",
+
+        // Google (Chrome)
+        "Google Arabic",
+        "Google UK English Female",
+
+        // Firefox / System Fallbacks
+        "Arabic",
+        "Hoda",
+        "Naayf",
+        "Laila",
+
+        // Standard English Fallbacks
         "Microsoft Aria",
         "Microsoft Jenny",
-        "Microsoft Sonia",
-        "Microsoft Natasha",
-        "Microsoft Zira",
+        "Samantha",
 
-        // Chrome
-        "Google UK English Female",
+        // Google voices
         "Google US English",
+        "Google UK English Female",
 
         // Safari
         "Samantha",
-        "Karen",
-        "Tessa",
       ];
 
       let selected =
@@ -128,15 +140,13 @@ const ChatInterface = () => {
             v.name.toLowerCase().includes(name.toLowerCase()),
           ),
         ) ||
-        // fallback: any voice explicitly containing female
+        voices.find((v) => v.lang.startsWith("ar")) || // fallback to any Arabic voice
         voices.find((v) => /female|woman/i.test(v.name)) ||
-        // final fallback: first English voice
         voices.find((v) => v.lang.startsWith("en")) ||
         null;
 
       selectedVoiceRef.current = selected;
-
-     };
+    };
 
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
@@ -180,9 +190,24 @@ const ChatInterface = () => {
     const cleanText = text.replace(/<[^>]*>/g, "");
     const utterance = new SpeechSynthesisUtterance(cleanText);
 
-    utterance.lang = "en-US";
-    utterance.rate = 1;
-    utterance.pitch = 1.1;
+    // Detect Arabic text
+    const hasArabic = /[\u0600-\u06FF]/.test(cleanText);
+
+    // Default to the voice's native language if we have an Arabic voice selected
+    if (
+      selectedVoiceRef.current &&
+      selectedVoiceRef.current.lang.startsWith("ar")
+    ) {
+      utterance.lang = selectedVoiceRef.current.lang;
+      // HUMAN-LIKE TWEAKS:
+      // Arabic sounds more natural when slightly slower and at a middle-to-lower pitch
+      utterance.rate = 0.9; // Friendly teaching pace
+      utterance.pitch = 1.05; // Slightly higher for a friendly, warm teacher vibe
+    } else {
+      utterance.lang = hasArabic ? "ar-SA" : "en-US";
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+    }
 
     if (selectedVoiceRef.current) {
       utterance.voice = selectedVoiceRef.current;
@@ -691,78 +716,36 @@ const ChatInterface = () => {
     }
   }, [currentStatus]);
 
-useEffect(() => {
-  if (!chatBodyRef.current) return;
+  useEffect(() => {
+    if (!chatBodyRef.current) return;
 
-  const el = chatBodyRef.current;
+    const el = chatBodyRef.current;
 
-   el.scrollTo({
-    top: el.scrollHeight,
-    behavior: "smooth",
-  });
-}, [messages]);
-
-
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages]);
 
   return (
     <div className="ai-tutor-app">
       <header className="ai-topbar">
-        <div className="ai-logo">
-          <HiOutlineAcademicCap className="logo-icon" />
-
-          <div className="logo-text">
-            <span className="logo-title">AI Tutor</span>
-            <h6 className="logo-subtitle">Let's learn together! 🚀</h6>
-          </div>
-        </div>
-
         <span>⚙️</span>
+        <div className="ai-logo">
+          <div className="logo-text">
+            <span className="logo-title">المعلم الذكي</span>
+            <h6 className="logo-subtitle">🚀 لنتعلم معًا!</h6>
+          </div>
+          <HiOutlineAcademicCap className="logo-icon" />
+        </div>
       </header>
 
       <div className="main-container">
-        <aside className="ai-sidebar">
-          <button className="new-chat-btn">+ Start New Chat</button>
-
-          <div className="sidebar-section">
-            <p className="sidebar-title">Pick a Subject</p>
-            <ul>
-              <li className="active"> 🔬 Science</li>
-              <li>📐 Mathematics</li>
-              <li>📖 Literature</li>
-              <li>🌍 History</li>
-            </ul>
-          </div>
-
-          <div className="sidebar-section">
-            <p className="sidebar-title">Choose Lesson/Chapter</p>
-            <div className="static-pill">Biology</div>
-          </div>
-
-          <div className="sidebar-section">
-            <p className="sidebar-title"> 💭 Your Recent Chats</p>
-
-            <div className="recent-chat-item">
-              <div>
-                <p className="chat-title"> What Is Photosynthesis ? </p>
-                <h6 className="chat-date">Today</h6>
-              </div>
-            </div>
-            <div className="recent-chat-item">
-              <div>
-                <p className="chat-title">
-                  Help me to solve this Quadratic equation
-                </p>
-                <h6 className="chat-date">Yesterday</h6>
-              </div>
-            </div>
-          </div>
-        </aside>
-
         <main className="ai-main">
           {/* ===== Chat Area ===== */}
 
           <section className="ai-chat-container">
-            <div className="chat-wrapper">
+            <div className="chat-wrapper" dir="rtl">
               <div
                 className="chat-body"
                 ref={chatBodyRef}
@@ -770,27 +753,31 @@ useEffect(() => {
               >
                 {/* ===== Welcome Screen ===== */}
                 {noUserMessages && (
-                  <div className="welcome-screen">
+                  <div className="welcome-screen" dir="rtl">
                     <div className="welcome-icon">
                       <HiOutlineBookOpen />
                     </div>
-                    <h2>Hey there! Ready to learn? 👋</h2>
+
+                    <h2>مرحبًا! هل أنت مستعد للتعلّم؟ 👋</h2>
+
                     <p>
-                      I'm your friendly AI tutor, here to help you understand
-                      anything! Ask me questions, get homework help, or practice
-                      for your next test.
+                      أنا معلمك الذكي الودود، هنا لمساعدتك على فهم أي شيء!
+                      اسألني أسئلة، احصل على مساعدة في واجباتك، أو تدرب للاختبار
+                      القادم.
                     </p>
 
                     <div className="suggestions">
-                      <div>💡 "Explain photosynthesis like I'm 10"</div>
-                      <div>📐 "Help me solve x² + 5x + 6 = 0"</div>
-                      <div>🎯 "Quiz me on the American Revolution"</div>
+                      <div>
+                        💡 "اشرح عملية البناء الضوئي وكأن عمري 10 سنوات"
+                      </div>
+                      <div>📐 "ساعدني في حل المعادلة x² + 5x + 6 = 0"</div>
+                      <div>🎯 "اختبرني في الثورة الأمريكية"</div>
                     </div>
 
                     <div className="quick-actions">
-                      <button disabled>✨ Explain this simply</button>
-                      <button disabled>📝 Help with homework</button>
-                      <button disabled>🎯 Quiz me!</button>
+                      <button disabled>✨ اشرح هذا ببساطة</button>
+                      <button disabled>📝 المساعدة في الواجبات</button>
+                      <button disabled>🎯 اختبرني!</button>
                     </div>
                   </div>
                 )}
@@ -883,6 +870,18 @@ useEffect(() => {
               {/* ===== Input Bar ===== */}
               <div className="chat-input">
                 <div className="input-container">
+                  <button
+                    className="attach-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <FiPaperclip size={18} />
+                  </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    hidden
+                    onChange={handleMediaUpload}
+                  />
                   {filePreviewUrl && pendingFile && (
                     <div className="inline-preview">
                       <span>📄</span>
@@ -900,30 +899,20 @@ useEffect(() => {
                       </button>
                     </div>
                   )}
-
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    hidden
-                    onChange={handleMediaUpload}
-                  />
-
                   <input
                     className="message-input"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    onClick={() => window.speechSynthesis.cancel()} // unlock speech
-                    placeholder={pendingFile ? "" : "Write message here..."}
+                    onClick={() => window.speechSynthesis.cancel()}
+                    placeholder={
+                      pendingFile
+                        ? ""
+                        : "اسألني أي شيء! أنا هنا لمساعدتك على التعلم 😊"
+                    }
                     onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   />
                   <button className="voice-btn">
                     <MdOutlineKeyboardVoice />
-                  </button>
-                  <button
-                    className="attach-btn"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <FiPaperclip size={18} />
                   </button>
                 </div>
 
@@ -934,6 +923,53 @@ useEffect(() => {
             </div>
           </section>
         </main>
+        <div>
+          <aside className="ai-sidebar">
+            <button className="new-chat-btn">+ ابدأ محادثة جديدة</button>
+
+            <div className="sidebar-section">
+              <p className="sidebar-title">اختر المادة</p>
+              <ul>
+                <li className="active"> 🔬 العلوم</li>
+                <li>📐 الرياضيات</li>
+                <li>📖 الأدب</li>
+                <li>🌍 التاريخ</li>
+              </ul>
+            </div>
+
+            <div className="sidebar-section">
+              <p className="sidebar-title">اختر الدرس / الفصل</p>
+              <div className="static-pill">الأحياء</div>
+            </div>
+
+            <div className="sidebar-section">
+              <p className="sidebar-title">💭 محادثاتك الأخيرة</p>
+
+              <div className="recent-chat-item">
+                <div>
+                  <p className="chat-title">ما هو التمثيل الضوئي؟</p>
+                  <h6 className="chat-date">اليوم</h6>
+                </div>
+              </div>
+              <div>
+                <p className="chat-title">اشرح مفهوم الطاقة الحركية</p>
+                <h6 className="chat-date">اليوم</h6>
+              </div>
+            </div>
+            <div className="recent-chat-item">
+              <div>
+                <p className="chat-title">اشرح لي دورة حياة الخلية</p>
+                <h6 className="chat-date">أمس</h6>
+              </div>
+            </div>
+            <div className="recent-chat-item">
+              <div>
+                <p className="chat-title">ساعدني في حل المعادلات التربيعية</p>
+                <h6 className="chat-date">أمس</h6>
+              </div>
+            </div>
+          </aside>
+        </div>
       </div>
     </div>
   );
