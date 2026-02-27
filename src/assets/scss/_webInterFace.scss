@@ -435,7 +435,7 @@
 }
 .ai-speaking-overlay {
   position: absolute;
-  right: 40px;
+  left: 30px !important;
   bottom: 85px;
   z-index: 50;
 }

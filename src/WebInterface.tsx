@@ -16,6 +16,7 @@ import { FiPaperclip, FiX } from "react-icons/fi";
 import he from "he";
 import { MdOutlineKeyboardVoice } from "react-icons/md";
 
+
 const SESSION_KEY = "chat_session_id";
 const SESSION_TIMESTAMP_KEY = "chat_session_created_at";
 const MAX_AGE_MS = 60 * 60 * 1000;
@@ -95,64 +96,18 @@ const ChatInterface = () => {
   const [_mediaLoader, setMediaLoader] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
-  const selectedVoiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const speechQueueRef = useRef<string[]>([]);
   const isSpeechPlayingRef = useRef(false);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
-    const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-
-      // Priority list of known female voices across browsers
-      const preferredFemaleNames = [
-        // Microsoft (Edge) - Best quality
-        "Microsoft Salma Online",
-        "Microsoft Zariyah Online",
-        "Microsoft Hoda Online",
-        "Microsoft Amany",
-
-        // Google (Chrome)
-        "Google Arabic",
-        "Google v3 Arabic Female",
-        "Google v3 Saudi Arabia Female",
-        "Arabic (Saudi Arabia)",
-        "Arabic (Egypt)",
-        "Arabic (Kuwait)",
-        "Arabic (UAE)",
-        "ar-XA",
-
-        // Firefox / System Fallbacks
-        "Arabic",
-        "Hoda",
-        "Naayf",
-        "Laila",
-        "Maged",
-
-        // Standard English Fallbacks
-        "Microsoft Aria",
-        "Microsoft Jenny",
-        "Google UK English Female",
-        "Google US English",
-        "Samantha",
-      ];
-
-      let selected =
-        voices.find((v) =>
-          preferredFemaleNames.some((name) =>
-            v.name.toLowerCase().includes(name.toLowerCase()),
-          ),
-        ) ||
-        voices.find((v) => v.lang.startsWith("ar")) || // fallback to any Arabic voice
-        voices.find((v) => /female|woman/i.test(v.name)) ||
-        voices.find((v) => v.lang.startsWith("en")) ||
-        null;
-
-      selectedVoiceRef.current = selected;
-    };
-
-    loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
-  }, []);
+    if (isSpeaking) {
+      videoRef.current?.play().catch(e => console.error("Video play error:", e));
+    } else {
+      videoRef.current?.pause();
+    }
+  }, [isSpeaking]);
 
   let offset = 0;
   let allMessages: any[] = [];
@@ -180,7 +135,7 @@ const ChatInterface = () => {
     );
   };
 
-  const playNextInQueue = () => {
+  const playNextInQueue = async () => {
     if (isSpeechPlayingRef.current) return;
     if (speechQueueRef.current.length === 0) return;
 
@@ -190,70 +145,50 @@ const ChatInterface = () => {
     isSpeechPlayingRef.current = true;
 
     const cleanText = text.replace(/<[^>]*>/g, "");
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-
+    
     // Detect Arabic text
     const hasArabic = /[\u0600-\u06FF]/.test(cleanText);
-    const voices = window.speechSynthesis.getVoices();
+    const voiceToUse = hasArabic ? "ar-EG-SalmaNeural" : "en-US-AvaMultilingualNeural";
 
-    // Priority list of female/natural voices
-    const preferredVoices = [
-      // Arabic Natural/Female
-      "Microsoft Salma Online",
-      "Microsoft Zariyah Online",
-      "Microsoft Hoda Online",
-      "Google v3 Arabic Female",
-      "Google v3 Saudi Arabia Female",
-      "Google Arabic",
-      "Arabic (Saudi Arabia)",
-      "Arabic (Egypt)",
-      "Microsoft Amany",
-      "Laila",
-      "Hoda",
+    try {
+      // Stream audio directly to Audio element (relies on Vite/Nginx proxy to reach backend)
+      const streamUrl = `/api/tts?text=${encodeURIComponent(cleanText)}&voice=${encodeURIComponent(voiceToUse)}`;
+      
+      const audio = new Audio(streamUrl);
+      
+      currentAudioRef.current = audio;
 
-      // English Natural/Female
-      "Microsoft Aria Online",
-      "Microsoft Jenny Online",
-      "Google US English",
-      "Google UK English Female",
-      "Samantha",
-    ];
+      audio.onended = () => {
+        setIsSpeaking(false);
+        isSpeechPlayingRef.current = false;
+        currentAudioRef.current = null;
+        playNextInQueue();
+      };
+      
+      audio.onerror = (e) => {
+        console.error("Audio playback error:", e);
+        setIsSpeaking(false);
+        isSpeechPlayingRef.current = false;
+        currentAudioRef.current = null;
+        playNextInQueue();
+      };
 
-    // Find best voice for the detection
-    const voiceToUse = voices.find((v) => {
-      const isCorrectLang = hasArabic
-        ? v.lang.startsWith("ar")
-        : v.lang.startsWith("en");
-      return (
-        isCorrectLang &&
-        preferredVoices.some((pref) => v.name.toLowerCase().includes(pref.toLowerCase()))
-      );
-    }) || voices.find(v => hasArabic ? v.lang.startsWith("ar") : v.lang.startsWith("en"));
+      audio.onplaying = () => {
+        setIsSpeaking(true);
+      };
 
-    if (voiceToUse) {
-      utterance.voice = voiceToUse;
-      utterance.lang = voiceToUse.lang;
-    } else {
-      utterance.lang = hasArabic ? "ar-SA" : "en-US";
-    }
+      audio.onpause = () => {
+        setIsSpeaking(false);
+      };
 
-    if (hasArabic) {
-      utterance.rate = 0.9;
-      utterance.pitch = 1.05;
-    } else {
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-    }
-
-    utterance.onstart = () => setIsSpeaking(true);
-
-    utterance.onend = () => {
+      await audio.play();
+    } catch (error) {
+      console.error("TTS Error:", error);
       setIsSpeaking(false);
       isSpeechPlayingRef.current = false;
-      playNextInQueue(); // play next message automatically
-    };
-
-    window.speechSynthesis.speak(utterance);
+      currentAudioRef.current = null;
+      playNextInQueue();
+    }
   };
 
   const decodeHtml = (html: string): string => {
@@ -472,7 +407,7 @@ const ChatInterface = () => {
   };
 
   useEffect(() => {
-    const intervalId = setInterval(checkNotificationCount, 1000);
+    const intervalId = setInterval(checkNotificationCount, 3000);
     return () => clearInterval(intervalId);
   }, []);
 
@@ -890,20 +825,21 @@ const ChatInterface = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              {isSpeaking && (
-                <div className="ai-speaking-overlay">
-                  <video
-                    src="/women_speaking.mp4"
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    height={"200px"}
-                    width={"200px"}
-                    style={{ borderRadius: "30px" }}
-                  />
-                </div>
-              )}
+              <div 
+                className="ai-speaking-overlay"
+                style={{ display: isSpeaking ? "block" : "none" }}
+              >
+                <video
+                  ref={videoRef}
+                  src="/women_speaking.mp4"
+                  muted
+                  loop
+                  playsInline
+                  height={"200px"}
+                  width={"200px"}
+                  style={{ borderRadius: "30px" }}
+                />
+              </div>
 
               {/* ===== Input Bar ===== */}
               <div className="chat-input">
