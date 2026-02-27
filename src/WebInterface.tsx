@@ -113,24 +113,26 @@ const ChatInterface = () => {
 
         // Google (Chrome)
         "Google Arabic",
-        "Google UK English Female",
+        "Google v3 Arabic Female",
+        "Google v3 Saudi Arabia Female",
+        "Arabic (Saudi Arabia)",
+        "Arabic (Egypt)",
+        "Arabic (Kuwait)",
+        "Arabic (UAE)",
+        "ar-XA",
 
         // Firefox / System Fallbacks
         "Arabic",
         "Hoda",
         "Naayf",
         "Laila",
+        "Maged",
 
         // Standard English Fallbacks
         "Microsoft Aria",
         "Microsoft Jenny",
-        "Samantha",
-
-        // Google voices
-        "Google US English",
         "Google UK English Female",
-
-        // Safari
+        "Google US English",
         "Samantha",
       ];
 
@@ -192,25 +194,55 @@ const ChatInterface = () => {
 
     // Detect Arabic text
     const hasArabic = /[\u0600-\u06FF]/.test(cleanText);
+    const voices = window.speechSynthesis.getVoices();
 
-    // Default to the voice's native language if we have an Arabic voice selected
-    if (
-      selectedVoiceRef.current &&
-      selectedVoiceRef.current.lang.startsWith("ar")
-    ) {
-      utterance.lang = selectedVoiceRef.current.lang;
-      // HUMAN-LIKE TWEAKS:
-      // Arabic sounds more natural when slightly slower and at a middle-to-lower pitch
-      utterance.rate = 0.9; // Friendly teaching pace
-      utterance.pitch = 1.05; // Slightly higher for a friendly, warm teacher vibe
+    // Priority list of female/natural voices
+    const preferredVoices = [
+      // Arabic Natural/Female
+      "Microsoft Salma Online",
+      "Microsoft Zariyah Online",
+      "Microsoft Hoda Online",
+      "Google v3 Arabic Female",
+      "Google v3 Saudi Arabia Female",
+      "Google Arabic",
+      "Arabic (Saudi Arabia)",
+      "Arabic (Egypt)",
+      "Microsoft Amany",
+      "Laila",
+      "Hoda",
+
+      // English Natural/Female
+      "Microsoft Aria Online",
+      "Microsoft Jenny Online",
+      "Google US English",
+      "Google UK English Female",
+      "Samantha",
+    ];
+
+    // Find best voice for the detection
+    const voiceToUse = voices.find((v) => {
+      const isCorrectLang = hasArabic
+        ? v.lang.startsWith("ar")
+        : v.lang.startsWith("en");
+      return (
+        isCorrectLang &&
+        preferredVoices.some((pref) => v.name.toLowerCase().includes(pref.toLowerCase()))
+      );
+    }) || voices.find(v => hasArabic ? v.lang.startsWith("ar") : v.lang.startsWith("en"));
+
+    if (voiceToUse) {
+      utterance.voice = voiceToUse;
+      utterance.lang = voiceToUse.lang;
     } else {
       utterance.lang = hasArabic ? "ar-SA" : "en-US";
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
     }
 
-    if (selectedVoiceRef.current) {
-      utterance.voice = selectedVoiceRef.current;
+    if (hasArabic) {
+      utterance.rate = 0.9;
+      utterance.pitch = 1.05;
+    } else {
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
     }
 
     utterance.onstart = () => setIsSpeaking(true);
@@ -440,7 +472,7 @@ const ChatInterface = () => {
   };
 
   useEffect(() => {
-    const intervalId = setInterval(checkNotificationCount, 3000);
+    const intervalId = setInterval(checkNotificationCount, 1000);
     return () => clearInterval(intervalId);
   }, []);
 
@@ -719,12 +751,18 @@ const ChatInterface = () => {
   useEffect(() => {
     if (!chatBodyRef.current) return;
 
-    const el = chatBodyRef.current;
+    const scrollToBottom = () => {
+      if (chatBodyRef.current) {
+        chatBodyRef.current.scrollTop = chatBodyRef.current.scrollHeight;
+      }
+    };
 
-    el.scrollTo({
-      top: el.scrollHeight,
-      behavior: "smooth",
-    });
+    // Scroll immediately
+    scrollToBottom();
+    
+    // Fallback for slower renders (e.g., images/math)
+    const timeoutId = setTimeout(scrollToBottom, 50);
+    return () => clearTimeout(timeoutId);
   }, [messages]);
 
   return (
@@ -923,53 +961,51 @@ const ChatInterface = () => {
             </div>
           </section>
         </main>
-        <div>
-          <aside className="ai-sidebar">
-            <button className="new-chat-btn">+ ابدأ محادثة جديدة</button>
+        <aside className="ai-sidebar">
+          <button className="new-chat-btn">+ ابدأ محادثة جديدة</button>
 
-            <div className="sidebar-section">
-              <p className="sidebar-title">اختر المادة</p>
-              <ul>
-                <li className="active"> 🔬 العلوم</li>
-                <li>📐 الرياضيات</li>
-                <li>📖 الأدب</li>
-                <li>🌍 التاريخ</li>
-              </ul>
-            </div>
+          <div className="sidebar-section">
+            <p className="sidebar-title">اختر المادة</p>
+            <ul>
+              <li className="active"> 🔬 العلوم</li>
+              <li>📐 الرياضيات</li>
+              <li>📖 الأدب</li>
+              <li>🌍 التاريخ</li>
+            </ul>
+          </div>
 
-            <div className="sidebar-section">
-              <p className="sidebar-title">اختر الدرس / الفصل</p>
-              <div className="static-pill">الأحياء</div>
-            </div>
+          <div className="sidebar-section">
+            <p className="sidebar-title">اختر الدرس / الفصل</p>
+            <div className="static-pill">الأحياء</div>
+          </div>
 
-            <div className="sidebar-section">
-              <p className="sidebar-title">💭 محادثاتك الأخيرة</p>
+          <div className="sidebar-section">
+            <p className="sidebar-title">💭 محادثاتك الأخيرة</p>
 
-              <div className="recent-chat-item">
-                <div>
-                  <p className="chat-title">ما هو التمثيل الضوئي؟</p>
-                  <h6 className="chat-date">اليوم</h6>
-                </div>
-              </div>
+            <div className="recent-chat-item">
               <div>
-                <p className="chat-title">اشرح مفهوم الطاقة الحركية</p>
+                <p className="chat-title">ما هو التمثيل الضوئي؟</p>
                 <h6 className="chat-date">اليوم</h6>
               </div>
             </div>
-            <div className="recent-chat-item">
-              <div>
-                <p className="chat-title">اشرح لي دورة حياة الخلية</p>
-                <h6 className="chat-date">أمس</h6>
-              </div>
+            <div>
+              <p className="chat-title">اشرح مفهوم الطاقة الحركية</p>
+              <h6 className="chat-date">اليوم</h6>
             </div>
-            <div className="recent-chat-item">
-              <div>
-                <p className="chat-title">ساعدني في حل المعادلات التربيعية</p>
-                <h6 className="chat-date">أمس</h6>
-              </div>
+          </div>
+          <div className="recent-chat-item">
+            <div>
+              <p className="chat-title">اشرح لي دورة حياة الخلية</p>
+              <h6 className="chat-date">أمس</h6>
             </div>
-          </aside>
-        </div>
+          </div>
+          <div className="recent-chat-item">
+            <div>
+              <p className="chat-title">ساعدني في حل المعادلات التربيعية</p>
+              <h6 className="chat-date">أمس</h6>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
