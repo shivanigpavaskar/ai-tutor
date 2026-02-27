@@ -662,7 +662,7 @@ const ChatInterface = () => {
         console.error("ElevenLabs API Key is missing in .env (VITE_ELEVENLABS_API_KEY)");
         throw new Error("API Key missing");
       }
-      const voiceId = "v7UCHHCrHj1KBa4E41gb"; 
+      const voiceId = "haBt9ZGk4vPmKOxfqGVp"; 
       
       const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, { 
         method: "POST",

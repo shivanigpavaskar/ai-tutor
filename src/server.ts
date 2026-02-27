@@ -26,7 +26,7 @@ app.post("/api/tts/elevenlabs", async (req: Request, res: Response) => {
 console.log(process.env.ELEVENLABS_API_KEY);
   try {
     const response = await fetch(
-      "https://api.elevenlabs.io/v1/text-to-speech/kdUY91gH5xyDHapxlthT", // Updated voice ID from user request
+      "https://api.elevenlabs.io/v1/text-to-speech/haBt9ZGk4vPmKOxfqGVp", // Updated voice ID from user request
       {
         method: "POST",
         headers: {
